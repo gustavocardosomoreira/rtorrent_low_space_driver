@@ -5,11 +5,14 @@ from logging import debug, info, error, warning, critical
 import os
 import sys
 
+from systemd.journal import JournalHandler
+
 
 def parse_arguments(args):
     parser = argparse.ArgumentParser()
     parser.add_argument('--log-level', metavar="LEVEL", type=str, help="Log level", default=None)
     parser.add_argument('--config', metavar="FILE", type=str, help='Config file.')
+    parser.add_argument('--log-systemd', action='store_true', help='Activate systemd integration for the logger.')
     parser.add_argument('rest_args', metavar="ARGS", nargs='*')
     ns = parser.parse_args(args)
     return vars(ns)
@@ -24,11 +27,19 @@ def parse_configfile(config_file):
 
 def start_logger(ns, cfg):
     log_level = ns.get('log_level') or cfg.get('main', 'log_level', fallback='INFO')
-    logging.basicConfig(
-        level=getattr(logging, log_level),
-        format="%(asctime)s - %(levelname)8s - %(name)s - %(message)s",
-        force=True
-    )
+    if ns.get('log_systemd'):
+        logging.basicConfig(
+            level=getattr(logging, log_level),
+            format="%(levelname)8s - %(name)s - %(message)s",
+            handlers=[JournalHandler()],
+            force=True
+        )
+    else:
+        logging.basicConfig(
+            level=getattr(logging, log_level),
+            format="%(asctime)s - %(levelname)8s - %(name)s - %(message)s",
+            force=True
+        )
 
 
 class Configuration:
