@@ -7,6 +7,8 @@ import sys
 
 from systemd.journal import JournalHandler
 
+logger = logging.getLogger()
+
 
 def parse_arguments(args):
     parser = argparse.ArgumentParser()
@@ -25,21 +27,20 @@ def parse_configfile(config_file):
     return cfg
 
 
-def start_logger(ns, cfg):
-    log_level = ns.get('log_level') or cfg.get('main', 'log_level', fallback='INFO')
-    if ns.get('log_systemd'):
-        logging.basicConfig(
-            level=getattr(logging, log_level),
-            format="%(levelname)8s - %(name)s - %(message)s",
-            handlers=[JournalHandler()],
-            force=True
-        )
+def set_logger_level(log_level):
+    logger.setLevel(getattr(logging, log_level))
+
+
+def set_logger_handler(log_systemd):
+    if log_systemd:
+        hdl = JournalHandler()
+        formatter = logging.Formatter("%(levelname)8s - %(name)s - %(message)s")
     else:
-        logging.basicConfig(
-            level=getattr(logging, log_level),
-            format="%(asctime)s - %(levelname)8s - %(name)s - %(message)s",
-            force=True
-        )
+        hdl = logging.StreamHandler()
+        formatter = logging.Formatter("%(asctime)s - %(levelname)8s - %(name)s - %(message)s")
+    hdl.setFormatter(formatter)
+    logger.addHandler(hdl)
+
 
 
 class Configuration:
@@ -47,6 +48,7 @@ class Configuration:
 
     def __init__(self, args):
         self.arguments = parse_arguments(args)
+        set_logger_handler(self.arguments.get('log_systemd'))
         try:
             self._config_file_path = self.arguments.get('config') or self.DEFAULT_CONFIG_FILE_PATH
             self.configs = parse_configfile(os.path.expanduser(self._config_file_path))
@@ -54,4 +56,4 @@ class Configuration:
             critical('Config file not found! Exiting.')
             sys.exit(1)
 
-        start_logger(self.arguments, self.configs)
+        set_logger_level(self.arguments.get('log_level') or self.configs.get('main', 'log_level', fallback='INFO'))
